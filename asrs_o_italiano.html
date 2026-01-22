@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASRS-O – Versione Osservatore</title>
+
+<!-- EmailJS v4 -->
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script type="text/javascript">
+  emailjs.init('tLhmSfXReaAYqCkT9');
+</script>
+
+<!-- jsPDF -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<style>
+body { font-family: Arial, Helvetica, sans-serif; margin: 40px; background: #fafafa; color: #222; }
+h1 { font-size: 22px; }
+p { font-size: 14px; line-height: 1.5; }
+
+.info { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.info input { width: 100%; padding: 10px; font-size: 15px; }
+
+.question { background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 12px; border-radius: 6px; }
+.question-title { font-size: 15px; margin-bottom: 8px; }
+.scale { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.scale label { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 20px; background: #f7f7f7; cursor: pointer; }
+.scale input { transform: scale(1.2); }
+
+textarea { width: 100%; min-height: 80px; resize: vertical; padding: 8px; font-size: 15px; }
+
+#actionButtons { display:flex; gap:10px; margin:30px 0; }
+#actionButtons button { flex:1; padding:16px; font-size:17px; border-radius:32px; cursor:pointer; }
+
+.footer { margin-top: 30px; font-size: 12px; color: #555; }
+
+@media (max-width: 450px) { body { margin: 12px; } h1 { font-size: 18px; } p { font-size: 15px; } }
+@media print { #actionButtons { display: none; } .question { page-break-inside: avoid; } }
+</style>
+</head>
+
+<body>
+
+<h1>Scala di Valutazione dei Sintomi dell’ADHD nell’Adulto – Versione Osservatore (ASRS-O)</h1>
+
+<p><strong>Istruzioni:</strong> Rispondere alle domande seguenti valutando la persona
+sulla base delle osservazioni effettuate negli ultimi <strong>6 mesi</strong>.</p>
+
+<!-- Dati osservatore e persona valutata -->
+<div class="info">
+  <input type="text" name="date" placeholder="Data">
+  <input type="text" name="person_name" placeholder="Nome della persona valutata">
+  <input type="text" name="dob" placeholder="Data di nascita">
+  <input type="text" name="observer_name" placeholder="Nome dell’osservatore">
+  <input type="text" name="observer_phone" placeholder="Telefono dell’osservatore">
+  <input type="email" name="observer_email" placeholder="Email dell’osservatore">
+</div>
+
+<div id="questions"></div>
+
+<!-- Bottoni affiancati -->
+<div id="actionButtons">
+  <button id="pdfBtn">Scarica PDF</button>
+  <button id="sendBtn">Invia risultati</button>
+</div>
+
+<div class="footer">
+  <p><strong>Informazioni aggiuntive rilevanti:</strong></p>
+  <textarea id="extraInfo" placeholder="Inserire eventuali informazioni aggiuntive..."></textarea>
+  <p style="margin-top:10px;">© World Health Organization, 2005 – Traduzione non ufficiale a scopo clinico</p>
+</div>
+
+<script>
+// Domande ASRS-O
+const questions = [
+  "Quanto spesso ha difficoltà a portare a termine i dettagli finali di un progetto una volta terminata la fase complessa?",
+  "Quanto spesso ha difficoltà a organizzare attività che richiedono pianificazione?",
+  "Quanto spesso ha problemi a ricordare appuntamenti o impegni?",
+  "Quando ha compiti che richiedono molto impegno mentale, quanto spesso evitano o rimandano iniziarli?",
+  "Quanto spesso si muove in modo irrequieto (mani o piedi) quando deve restare seduta a lungo?",
+  "Quanto spesso sembra eccessivamente attiva, come se fosse spinta da un motore?",
+  "Quanto spesso commette errori di distrazione in progetti noiosi o difficili?",
+  "Quanto spesso ha difficoltà a mantenere l’attenzione in lavori noiosi o ripetitivi?",
+  "Quanto spesso ha difficoltà a concentrarsi su ciò che le viene detto direttamente?",
+  "Quanto spesso perde o fatica a trovare oggetti a casa o al lavoro?",
+  "Quanto spesso si distrae a causa di rumori o attività intorno a sé?",
+  "Quanto spesso si alza dal posto in situazioni in cui dovrebbe restare seduta?",
+  "Quanto spesso appare irrequieta o agitata?",
+  "Quanto spesso ha difficoltà a rilassarsi quando ha tempo per sé?",
+  "Quanto spesso parla troppo in situazioni sociali?",
+  "Quanto spesso finisce le frasi degli altri prima che vengano completate durante una conversazione?",
+  "Quanto spesso ha difficoltà ad aspettare il proprio turno quando si tratta di aspettare?",
+  "Quanto spesso questa persona interrompe gli altri?"
+];
+
+const labels = ["0 = Mai","1 = Raramente","2 = A volte","3 = Spesso","4 = Molto spesso"];
+const container = document.getElementById('questions');
+
+// Generazione dinamica domande
+questions.forEach((text, i) => {
+  const div = document.createElement('div');
+  div.className = 'question';
+  div.innerHTML = `
+    <div class="question-title"><strong>${i+1}.</strong> ${text}</div>
+    <div class="scale">
+      ${labels.map((l,j)=>`
+        <label>
+          <input type="radio" name="q${i+1}" value="${j}">${l}
+        </label>`).join('')}
+    </div>
+    <textarea name="details_q${i+1}" placeholder="Esempi / dettagli:"></textarea>
+  `;
+  container.appendChild(div);
+});
+
+// Funzione per generare PDF e emailText
+function generatePDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 10;
+  let emailText = "ASRS-O – Versione Osservatore\n\n";
+
+  // Dati info
+  const infoInputs = document.querySelectorAll('.info input');
+  infoInputs.forEach(input => {
+    const val = input.value || "Non compilato";
+    emailText += `${input.placeholder}: ${val}\n`;
+  });
+  emailText += "\n";
+
+  // Risposte domande
+  document.querySelectorAll('.question').forEach((q, i) => {
+    const title = q.querySelector('.question-title').innerText;
+    const checked = q.querySelector('input[type="radio"]:checked');
+    const value = checked ? checked.value : "non compilato";
+    const details = q.querySelector('textarea').value || "";
+
+    emailText += `${title}\nRisposta: ${value}\n`;
+    if(details) emailText += `Dettagli: ${details}\n`;
+    emailText += "\n";
+
+    // PDF
+    doc.setFontSize(12);
+    doc.text(`${i+1}. ${title}`, 10, y); y += 6;
+    doc.setFontSize(10);
+    doc.text(`Risposta: ${value}`, 10, y); y += 6;
+    if(details){
+      const split = doc.splitTextToSize("Dettagli: " + details, 180);
+      doc.text(split, 10, y);
+      y += split.length * 6;
+    }
+    y += 4;
+    if(y > 270){ doc.addPage(); y = 10; }
+  });
+
+  // Informazioni aggiuntive
+  const extra = document.getElementById('extraInfo').value || "";
+  if(extra){
+    emailText += "Informazioni aggiuntive:\n" + extra;
+  }
+
+  return { doc, emailText };
+}
+
+// Bottone PDF
+document.getElementById('pdfBtn').addEventListener('click', () => {
+  const { doc } = generatePDF();
+  const obsName = (document.querySelector('input[name="observer_name"]').value || "Osservatore").replace(/\s+/g,'_');
+  doc.save(`ASRS-O_${obsName}.pdf`);
+});
+
+// Bottone Invia risultati
+document.getElementById('sendBtn').addEventListener('click', async () => {
+  const { emailText } = generatePDF();
+
+  // Costruzione emailData per EmailJS
+  const infoInputs = document.querySelectorAll('.info input');
+  const emailData = {};
+  infoInputs.forEach(input => {
+    emailData[input.name] = input.value || "Non compilato";
+  });
+
+  // Risposte domande
+  const answers = {};
+  document.querySelectorAll('.question').forEach((q, i) => {
+    const checked = q.querySelector('input[type="radio"]:checked');
+    const value = checked ? checked.value : "non compilato";
+    const details = q.querySelector('textarea').value || "";
+    answers[`q${i+1}`] = value;
+    answers[`details_q${i+1}`] = details;
+  });
+
+  try{
+    await emailjs.send('service_198fh21','template_l7n4c9e',{
+      from_name: "ASRS-O Web Form",
+      to_name: "Enrico Zerbo",
+      to_email: "enrico.zerbo@email.com",
+      reply_to: emailData.observer_email || 'no-reply@asrs-o.local',
+      message: emailText,
+      ...emailData,
+      ...answers
+    });
+    alert("Risultati inviati correttamente!");
+  }catch(err){
+    console.error(err);
+    alert("Errore durante l'invio dei risultati.");
+  }
+});
+</script>
+
+</body>
+</html>
